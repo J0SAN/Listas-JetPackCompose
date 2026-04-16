@@ -11,10 +11,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInterfaceState: Bundle?){
-        super.onCreate(savedInterfaceState)
+    override fun onCreate(savedInstanceState: Bundle?){
+        super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme{
                 Surface(
@@ -28,26 +31,46 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UserListScreen(){
+fun UserListScreen() {
     var users by remember { mutableStateOf<List<User>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
+    val coroutineScope = rememberCoroutineScope()
+
+    suspend fun loadUsers() {
         try {
             val response = apiService.getUsers()
             users = response
-        } catch (e: Exception){
+        } catch (e: Exception) {
             e.printStackTrace()
         } finally {
             isLoading = false
+            isRefreshing = false
         }
     }
-    if (isLoading){
+
+    LaunchedEffect(Unit) {
+        loadUsers()
+    }
+
+    if (isLoading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
-        } else {
+    } else {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                coroutineScope.launch {
+                    loadUsers()
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        ) {
             LazyColumn(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -59,6 +82,7 @@ fun UserListScreen(){
             }
         }
     }
+}
 
     @Composable
     fun UserCard(user: User){
